@@ -90,10 +90,20 @@ async function run() {
           pin: pinHash,
         };
         const nid = user.nid;
-        const query = { nid };
+        const number = user.number;
+        const email = user.email;
+        const query = { $or: [{ nid }, { number }, { email }] };
         const existing = await UserCollection.findOne(query);
         if (existing) {
-          return res.send({ message: "NID is Already Use", success: true });
+          return res.send({
+            message:
+              existing.nid === nid
+                ? "NID is already in use"
+                : existing.number === number
+                ? "Mobile number is already in use"
+                : "Email is already in use",
+            success: true,
+          });
         }
         const result = await UserCollection.insertOne(newUser);
         res.send(result);
