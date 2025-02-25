@@ -69,6 +69,18 @@ async function run() {
       res.status(200).json({ message: "Token is valid", user: req.decoded });
     });
 
+    app.get("/userData/:email", async (req, res) => {
+      try {
+        const email = req.params.email;
+        const result = await UserCollection.findOne({
+          $or: [{ email: email }, { number: email }],
+        });
+        res.send(result);
+      } catch (error) {
+        res.send({ message: "There was a server error" });
+      }
+    });
+
     app.post("/user", async (req, res) => {
       try {
         const user = req.body;
@@ -87,6 +99,37 @@ async function run() {
         res.send(result);
       } catch (error) {
         res.send({ message: "There was a server error", error });
+      }
+    });
+    app.get("/login", async (req, res) => {
+      try {
+        const { pin, email } = req.query;
+        const existingUser = await UserCollection.findOne({
+          $or: [{ email: email }, { number: email }],
+        });
+        if (!existingUser) {
+          return res.send({
+            message: "User not found register first",
+            success: false,
+          });
+        }
+        const match = bcrypt.compareSync(pin, existingUser.pin);
+        if (!match) {
+          return res.send({
+            message: "Email and Pin not match",
+            success: false,
+          });
+        }
+        res.send({
+          message: "Login successful",
+          success: true,
+          user: existingUser,
+        });
+      } catch (error) {
+        res.status(500).send({
+          message: "There was a server error",
+          error,
+        });
       }
     });
 
