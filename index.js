@@ -20,20 +20,6 @@ const cookieOptions = {
   sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
 };
 
-const verifyToken = async (req, res, next) => {
-  const token = req.cookies?.token;
-  if (!token) {
-    return res.status(401).send({ message: "unauthorized access" });
-  }
-  jwt.verify(token, process.env.SECURE_TOKEN, (err, decoded) => {
-    if (err) {
-      return res.status(401).send({ message: "unauthorized access" });
-    }
-    req.user = decoded;
-    next();
-  });
-};
-
 const { MongoClient, ServerApiVersion } = require("mongodb");
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.rgxjhma.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -48,12 +34,39 @@ const client = new MongoClient(uri, {
 
 const UserCollection = client.db("Easy_Pay").collection("user");
 
+const verifyToken = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) {
+    return res
+      .status(401)
+      .json({ message: "Forbidden Access: No token provided" });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  jwt.verify(token, process.env.SECURE_TOKEN, (error, decoded) => {
+    if (error) {
+      return res
+        .status(401)
+        .json({ message: `Forbidden Access: ${error.message}` });
+    }
+
+    req.decoded = decoded;
+    next();
+  });
+};
+
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
     // await client.connect();
     // Send a ping to confirm a successful connection
     // await client.db("admin").command({ ping: 1 });
+
+    app.get("/verifyToken", verifyToken, (req, res) => {
+      res.status(200).json({ message: "Token is valid", user: req.decoded });
+    });
 
     app.post("/user", async (req, res) => {
       try {
@@ -70,14 +83,7 @@ async function run() {
       const token = jwt.sign(user, process.env.SECURE_TOKEN, {
         expiresIn: "365d",
       });
-      res.cookie("token", token, cookieOptions).send({ success: true });
-    });
-
-    app.post("/logout", async (req, res) => {
-      const user = req.body;
-      res
-        .clearCookie("token", { ...cookieOptions, maxAge: 0 })
-        .send({ success: true });
+      res.send({ token });
     });
 
     console.log(
