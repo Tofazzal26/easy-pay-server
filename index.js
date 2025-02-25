@@ -5,6 +5,7 @@ app.use(express.json());
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
+const bcrypt = require("bcrypt");
 app.use(cookieParser());
 require("dotenv").config();
 app.use(
@@ -71,7 +72,18 @@ async function run() {
     app.post("/user", async (req, res) => {
       try {
         const user = req.body;
-        const result = await UserCollection.insertOne(user);
+        const pinHash = bcrypt.hashSync(user.pin, 10);
+        const newUser = {
+          ...user,
+          pin: pinHash,
+        };
+        const nid = user.nid;
+        const query = { nid };
+        const existing = await UserCollection.findOne(query);
+        if (existing) {
+          return res.send({ message: "NID is Already Use", success: true });
+        }
+        const result = await UserCollection.insertOne(newUser);
         res.send(result);
       } catch (error) {
         res.send({ message: "There was a server error", error });
