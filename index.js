@@ -195,13 +195,13 @@ async function run() {
         }
         if (!reciver) {
           return res.send({
-            message: "Reciver User Not Found",
+            message: "Reciver User Not Found this app",
             success: false,
           });
         }
         if (!sender) {
           return res.send({
-            message: "Sender User Not Found",
+            message: "Sender User Not Found this app",
             success: false,
           });
         }
@@ -236,7 +236,7 @@ async function run() {
               notification: {
                 $each: [
                   {
-                    msg: `You have received ${parsedAmountSend} tk and Transaction ID: ${transactionId}`,
+                    msg: `You Cash In ${parsedAmountSend} tk and Transaction ID: ${transactionId}`,
                   },
                 ],
                 $position: 0,
@@ -251,7 +251,7 @@ async function run() {
               notification: {
                 $each: [
                   {
-                    msg: `You have Send ${parsedAmountSend}tk and Transaction ID: ${transactionId}`,
+                    msg: `You Send Out ${parsedAmountSend}tk and Transaction ID: ${transactionId}`,
                   },
                 ],
                 $position: 0,
@@ -278,11 +278,146 @@ async function run() {
         }
 
         res.send({
-          message: "Transaction successful",
+          message: "Send Money Successful",
           success: true,
         });
       } catch (error) {
         res.send({ message: "there was a server error " });
+      }
+    });
+
+    app.post("/cashOut", async (req, res) => {
+      try {
+        const {
+          type,
+          amountSend,
+          senderId,
+          receiverId,
+          fee,
+          timestamp,
+          status,
+          transactionId,
+          pin,
+        } = req.body;
+        const newTransaction = {
+          type,
+          amountSend,
+          senderId,
+          receiverId,
+          fee,
+          timestamp,
+          status,
+          transactionId,
+        };
+        const parsedAmountSend = parseFloat(amountSend);
+        const parsedFee = parseFloat(fee);
+        const adminFee = (parsedFee * 0.5) / 1.5;
+        const agentFee = (parsedFee * 1) / 1.5;
+        const admin = await UserCollection.findOne({ role: "admin" });
+        const reciver = await UserCollection.findOne({ number: receiverId });
+        const sender = await UserCollection.findOne({ number: senderId });
+        const pinMatch = bcrypt.compareSync(pin, sender.pin);
+        if (!pinMatch) {
+          return res.send({
+            message: "Pin not match",
+            success: false,
+          });
+        }
+        if (!reciver) {
+          return res.send({
+            message: "Reciver User number Not Found this app",
+            success: false,
+          });
+        }
+        if (!reciver || reciver.role !== "agent") {
+          return res.send({
+            message: "This number is not a agent number",
+            success: false,
+          });
+        }
+        if (!admin) {
+          return res.send({
+            message: "Admin Not Found",
+            success: false,
+          });
+        }
+        const reciverBalance = parseFloat(reciver.balance);
+        const senderBalance = parseFloat(sender.balance);
+        const adminBalance = parseFloat(admin.balance);
+        const updateAdminBalance = adminBalance + adminFee;
+        const updateReciverBalance =
+          reciverBalance + parsedAmountSend + agentFee;
+        const updateSenderBalance =
+          senderBalance - (parsedAmountSend + parsedFee);
+
+        if (updateSenderBalance < 0) {
+          return res.send({ message: "Not enough balance", success: false });
+        }
+        await UserCollection.updateOne(
+          { number: receiverId },
+          { $set: { balance: updateReciverBalance } }
+        );
+        await UserCollection.updateOne(
+          { number: receiverId },
+          {
+            $push: {
+              notification: {
+                $each: [
+                  {
+                    msg: `You Cash In ${parsedAmountSend}tk and Fee ${agentFee}tk and Transaction ID: ${transactionId}`,
+                  },
+                ],
+                $position: 0,
+              },
+            },
+          }
+        );
+        await UserCollection.updateOne(
+          { number: senderId },
+          { $set: { balance: updateSenderBalance } }
+        );
+        await UserCollection.updateOne(
+          { number: senderId },
+          {
+            $push: {
+              notification: {
+                $each: [
+                  {
+                    msg: `You Cash Out ${parsedAmountSend}tk and Transaction ID: ${transactionId}`,
+                  },
+                ],
+                $position: 0,
+              },
+            },
+          }
+        );
+        await UserCollection.updateOne(
+          { role: "admin" },
+          {
+            $push: {
+              notification: {
+                $each: [
+                  {
+                    msg: `You have recieve ${adminFee}tk`,
+                  },
+                ],
+                $position: 0,
+              },
+            },
+          }
+        );
+        await UserCollection.updateOne(
+          { role: "admin" },
+          { $set: { balance: updateAdminBalance } }
+        );
+        await TransactionCollection.insertOne(newTransaction);
+
+        res.send({
+          message: "Cash Out Successful",
+          success: true,
+        });
+      } catch (error) {
+        res.send({ message: "there was a server error" });
       }
     });
 
