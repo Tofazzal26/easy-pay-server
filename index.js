@@ -82,6 +82,18 @@ async function run() {
       }
     });
 
+    app.get("/transaction/:number", async (req, res) => {
+      try {
+        const number = req.params.number;
+        const result = await TransactionCollection.find({
+          $or: [{ senderId: number }, { receiverId: number }],
+        }).toArray();
+        res.send(result);
+      } catch (error) {
+        res.send({ message: "there was a server error", success: false });
+      }
+    });
+
     app.post("/user", async (req, res) => {
       try {
         const user = req.body;
