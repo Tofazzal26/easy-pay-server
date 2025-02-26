@@ -421,6 +421,96 @@ async function run() {
       }
     });
 
+    app.post("/cashIn", async (req, res) => {
+      try {
+        const {
+          type,
+          amountSend,
+          senderId,
+          receiverId,
+          timestamp,
+          status,
+          transactionId,
+          pin,
+        } = req.body;
+        const newTransaction = {
+          type,
+          amountSend,
+          senderId,
+          receiverId,
+          timestamp,
+          status,
+          transactionId,
+        };
+        const parsedAmountSend = parseFloat(amountSend);
+        const reciver = await UserCollection.findOne({ number: receiverId });
+        const sender = await UserCollection.findOne({ number: senderId });
+        const pinMatch = bcrypt.compareSync(pin, sender.pin);
+        if (!pinMatch) {
+          return res.send({
+            message: "Pin not match",
+            success: false,
+          });
+        }
+        if (!reciver) {
+          return res.send({
+            message: "Reciver User number Not Found this app",
+            success: false,
+          });
+        }
+        const reciverBalance = parseFloat(reciver.balance);
+        const senderBalance = parseFloat(sender.balance);
+        const updateReciverBalance = reciverBalance + parsedAmountSend;
+        const updateSenderBalance = senderBalance - parsedAmountSend;
+        if (updateSenderBalance < 0) {
+          return res.send({ message: "Not enough balance", success: false });
+        }
+        await UserCollection.updateOne(
+          { number: receiverId },
+          { $set: { balance: updateReciverBalance } }
+        );
+        await UserCollection.updateOne(
+          { number: senderId },
+          { $set: { balance: updateSenderBalance } }
+        );
+        await UserCollection.updateOne(
+          { number: receiverId },
+          {
+            $push: {
+              notification: {
+                $each: [
+                  {
+                    msg: `You Cash In ${parsedAmountSend}tk  and Transaction ID: ${transactionId}`,
+                  },
+                ],
+                $position: 0,
+              },
+            },
+          }
+        );
+        await UserCollection.updateOne(
+          { number: senderId },
+          {
+            $push: {
+              notification: {
+                $each: [
+                  {
+                    msg: `You Cash Out ${parsedAmountSend}tk  and Transaction ID: ${transactionId}`,
+                  },
+                ],
+                $position: 0,
+              },
+            },
+          }
+        );
+        await TransactionCollection.insertOne(newTransaction);
+
+        res.send({ message: "Cash In Successful", success: true });
+      } catch (error) {
+        res.send({ message: "there was a server error" });
+      }
+    });
+
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
