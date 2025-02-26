@@ -21,7 +21,7 @@ const cookieOptions = {
   sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
 };
 
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.rgxjhma.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -70,6 +70,28 @@ async function run() {
       res.status(200).json({ message: "Token is valid", user: req.decoded });
     });
 
+    app.patch("/userBlock/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const options = { upsert: true };
+        const user = req.body;
+        const userBlock = {
+          $set: {
+            isBlocked: user.block,
+          },
+        };
+        const result = await UserCollection.updateOne(
+          query,
+          userBlock,
+          options
+        );
+        res.send(result);
+      } catch (error) {
+        res.send({ message: "there was a server error", success: false });
+      }
+    });
+
     app.get("/userData/:email", async (req, res) => {
       try {
         const email = req.params.email;
@@ -82,12 +104,38 @@ async function run() {
       }
     });
 
+    app.get("/singleUserTransaction/:number", async (req, res) => {
+      try {
+        const num = req.params.number;
+        const query = {
+          $or: [{ senderId: num }, { receiverId: num }],
+        };
+        const result = await TransactionCollection.find(query).toArray();
+        res.send(result);
+      } catch (error) {
+        res.send({ message: "there was a server error", success: false });
+      }
+    });
+
     app.get("/transaction/:number", async (req, res) => {
       try {
         const number = req.params.number;
         const result = await TransactionCollection.find({
           $or: [{ senderId: number }, { receiverId: number }],
         }).toArray();
+        res.send(result);
+      } catch (error) {
+        res.send({ message: "there was a server error", success: false });
+      }
+    });
+    app.get("/allUser", async (req, res) => {
+      const { number } = req.query;
+      let query = {};
+      if (number) {
+        query = { number: { $regex: `^${number}`, $options: "i" } };
+      }
+      try {
+        const result = await UserCollection.find(query).toArray();
         res.send(result);
       } catch (error) {
         res.send({ message: "there was a server error", success: false });
