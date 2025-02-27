@@ -135,6 +135,29 @@ async function run() {
       }
     });
 
+    app.get("/totalBalance", async (req, res) => {
+      try {
+        const result = await UserCollection.aggregate([
+          {
+            $project: {
+              balance: { $toDouble: "$balance" },
+            },
+          },
+          {
+            $group: {
+              _id: null,
+              totalBalance: { $sum: "$balance" },
+            },
+          },
+        ]).toArray();
+
+        const totalBalance = result.length > 0 ? result[0].totalBalance : 0;
+        res.send({ totalBalance });
+      } catch (error) {
+        res.status(500).send({ message: "Server error", success: false });
+      }
+    });
+
     app.get("/userData/:email", async (req, res) => {
       try {
         const email = req.params.email;
