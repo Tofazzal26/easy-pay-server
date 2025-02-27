@@ -91,6 +91,49 @@ async function run() {
         res.send({ message: "there was a server error", success: false });
       }
     });
+    app.patch("/agentReject/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const user = req.body;
+
+        const userReject = {
+          $push: { notification: user.newNotification },
+          $set: { ant: "yes" },
+        };
+        const result = await UserCollection.updateOne(query, userReject);
+        res.send(result);
+      } catch (error) {
+        res
+          .status(500)
+          .send({ message: "There was a server error", success: false });
+      }
+    });
+
+    app.patch("/agentAccept/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const user = req.body;
+
+        const existingUser = await UserCollection.findOne(query);
+
+        let currentBalance = existingUser?.balance || "0";
+        let updatedBalance = parseFloat(currentBalance) + 100000;
+
+        const userAccept = {
+          $push: { notification: user.newNotification },
+          $set: { ant: "yes", balance: updatedBalance.toString() },
+        };
+
+        const result = await UserCollection.updateOne(query, userAccept);
+        res.send(result);
+      } catch (error) {
+        res
+          .status(500)
+          .send({ message: "There was a server error", success: false });
+      }
+    });
 
     app.get("/userData/:email", async (req, res) => {
       try {
@@ -135,6 +178,17 @@ async function run() {
         query = { number: { $regex: `^${number}`, $options: "i" } };
       }
       try {
+        const result = await UserCollection.find(query).toArray();
+        res.send(result);
+      } catch (error) {
+        res.send({ message: "there was a server error", success: false });
+      }
+    });
+
+    app.get("/allAgent", async (req, res) => {
+      try {
+        const rol = "agent";
+        const query = { role: rol };
         const result = await UserCollection.find(query).toArray();
         res.send(result);
       } catch (error) {
