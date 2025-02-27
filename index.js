@@ -196,6 +196,15 @@ async function run() {
       }
     });
 
+    app.get("/allTransaction", async (req, res) => {
+      try {
+        const result = await TransactionCollection.find().toArray();
+        res.send(result);
+      } catch (error) {
+        res.send({ message: "there are was a server error", success: false });
+      }
+    });
+
     app.post("/user", async (req, res) => {
       try {
         const user = req.body;
